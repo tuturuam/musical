@@ -31,7 +31,7 @@ Follow [Working on Windows](https://github.com/raysan5/raylib/wiki/Working-on-Wi
 
 Run
 ```bash
-gcc -Wall -Wextra -o musical.exe main.c -lraylib -lopengl32-lgdi32 -lwinmm -DPLATFORM_DESKTOP
+gcc -Wall -Wextra -o musical.exe main.c -lraylib -lopengl32 -lgdi32 -lwinmm -DPLATFORM_DESKTOP
 ./musical.exe
 ```
 
