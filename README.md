@@ -1,6 +1,6 @@
 # Musical
 
-![Video](./output.webm)
+![Video](./output2.webm)
 
 A early prototype music visualizer with transparency made with raylib in C.
 Enable a low-pass filter by pressing "f".
