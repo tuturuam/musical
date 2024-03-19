@@ -18,9 +18,20 @@ Enable a slow-down by pressing "k".
 
 ## Building 
 
-Make sure you have raylib installed. 
+Make sure you have raylib installed. And that you edit main.c to a screen size that actually fits your screen.
 
+### Linux
 Run 
 ```bash
 ./build.sh
 ```
+
+### Windows
+Follow [Working on Windows](https://github.com/raysan5/raylib/wiki/Working-on-Windows#manual-setup-with-w64devkit) until step 4.
+
+Run
+```bash
+gcc -Wall -Wextra -o musical.exe main.c -lraylib -lopengl32-lgdi32 -lwinmm -DPLATFORM_DESKTOP
+./musical.exe
+```
+
