@@ -13,6 +13,9 @@ Enable a low-pass filter by pressing "f".
 
 Enable a slow-down by pressing "k".
 
+[output3.webm](https://github.com/tuturuam/musical/assets/31025785/f3e2cd97-fd93-40c5-86ae-e223123a3c10)
+
+
 ## Building 
 
 Make sure you have raylib installed. 
