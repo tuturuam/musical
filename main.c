@@ -8,19 +8,15 @@
 
 #define GLSL_VERSION 330
 
-static float *filterBuffer = NULL;
-static unsigned int filterBufferSize = 0;
-static unsigned int filterReadIndex = 2;
-static unsigned int filterWriteIndex = 0;
-
 static float averageVolume[2] = {0.0f};
 
 static void AudioProcessEffectLPF(void *buffer, unsigned int frames);
 static void AudioProcessEffectAverage(void *buffer, unsigned int frames);
+static void applyShader(Shader *shader, Texture *texture, Model *model);
 
 int main() {
-  const int screenWidth = 2560;
-  const int screenHeight = 1440;
+  const int screenWidth = 800;
+  const int screenHeight = 600;
   SetConfigFlags(FLAG_MSAA_4X_HINT);
   SetConfigFlags(FLAG_WINDOW_TRANSPARENT);
   InitWindow(screenWidth, screenHeight, "test");
@@ -40,15 +36,10 @@ int main() {
 
   // Load models
   Model plane = LoadModelFromMesh(GenMeshPlane(40.0f, 40.0f, 3, 3));
-  Model sphere = LoadModel("./resources/models/barracks.obj");
+  Model castle = LoadModel("./resources/models/barracks.obj");
   Texture2D texture = LoadTexture("./resources/models/barracks_diffuse.png");
-  Texture2D spec = LoadTexture("./resources/mask.png");
 
   // Load shader
-  // Shader shader = LoadShader(
-  //     TextFormat("resources/shaders/glsl%i/lighting.vs", GLSL_VERSION),
-  //     TextFormat("./resources/shaders/glsl330/raymarching.fs",
-  //     GLSL_VERSION));
   Shader shaders[2] = {0};
 
   shaders[0] = LoadShader(
@@ -61,30 +52,21 @@ int main() {
 
   Light light = CreateLight(LIGHT_POINT, (Vector3){0, 3, 0}, Vector3Zero(),
                             SKYBLUE, shaders[0]);
-  int ambientLoc = GetShaderLocation(shaders[0], "ambient");
-  plane.materials[0].shader = shaders[0];
-  plane.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
-  // plane.materials[0].maps[MATERIAL_MAP_SPECULAR].texture = spec;
-  sphere.materials[0].shader = shaders[0];
-  sphere.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
-  // sphere.materials[0].maps[MATERIAL_MAP_SPECULAR].texture = spec;
-  for (int i = 0; i < 2; i++) {
-    shaders[i].locs[SHADER_LOC_VECTOR_VIEW] =
-        GetShaderLocation(shaders[i], "viewPos");
 
-    // ambient light
-    SetShaderValue(shaders[i], ambientLoc, (float[4]){0.0f, 0.05, 0.1f, 1.0f},
-                   SHADER_UNIFORM_VEC4);
-  }
+  // Bind shaders and textures to meshes
+  applyShader(&shaders[0], &texture, &plane);
+  applyShader(&shaders[0], &texture, &castle);
 
   printf("hello world\n");
   printf("%s\n", GetMonitorName(1));
 
   // Audio
+  // TODO: There's a periodic clicking noise which I assume is from
+  // the device's sample rate not being the same as the track's
+  // (44100 vs 48000)
   Music music = LoadMusicStream("./test.mp3"); // Load music stream
                                                // load from file
   // Allocate buffer
-  filterBufferSize = 4 * (48000 * 2);
   PlayMusicStream(music);
 
   bool enableEffectLPF = false;
@@ -93,14 +75,10 @@ int main() {
 
   SetTargetFPS(240);
 
-  RenderTexture2D target = LoadRenderTexture(screenWidth, screenHeight);
-
   float lastVol = 0.1;
-  float runTime = 0.0f;
   while (!WindowShouldClose()) {
     // update
     float k = 0.01f;
-    runTime += GetFrameTime();
     if (IsKeyPressed(KEY_TAB)) {
       mouseLock = !mouseLock;
       if (mouseLock) {
@@ -152,10 +130,10 @@ int main() {
     //     lerped = 0.1;
     //   // printf("%.2f\n", k);
     //   // printf("%.2f\n", lerped);
-    //   DrawModel(sphere, (Vector3){0.0f, 0.0f, 0.0f}, lerped, WHITE);
+    //   DrawModel(castle, (Vector3){0.0f, 0.0f, 0.0f}, lerped, WHITE);
     // }
 
-    // DrawSphereEx(light.position, 0.2f, 4, 4, WHITE);
+    // DrawcastleEx(light.position, 0.2f, 4, 4, WHITE);
     // DrawGrid(40, 1.0f);
     // lastVol = lerped;
     // EndMode3D(); // End 3d mode drawing, returns to orthographic 2d mode
@@ -183,9 +161,7 @@ int main() {
       lerped = Lerp(lastVol, averageVolume[i], k);
       if (lerped < 0.1)
         lerped = 0.1;
-      // printf("%.2f\n", k);
-      // printf("%.2f\n", lerped);
-      DrawModel(sphere, (Vector3){0.0f, 0.0f, 0.0f}, lerped, WHITE);
+      DrawModel(castle, (Vector3){0.0f, 0.0f, 0.0f}, lerped, WHITE);
     }
 
     DrawSphereEx(light.position, 0.2f, 4, 4, WHITE);
@@ -208,7 +184,7 @@ int main() {
   UnloadTexture(texture);
 
   UnloadModel(plane);
-  UnloadModel(sphere);
+  UnloadModel(castle);
   for (int i = 0; i < 2; i++) {
     UnloadShader(shaders[i]);
   }
@@ -224,11 +200,9 @@ static void AudioProcessEffectLPF(void *buffer, unsigned int frames) {
   static float low[2] = {0.0f, 0.0f};
   static const float cutoff = 50.0f / 44100.0f;      // 70 Hz lowpass filter
   const float k = cutoff / (cutoff + 0.1591549431f); // RC filter formula
-  const float attack = 0.5f;
 
   // Converts the buffer data before using it
   float *bufferData = (float *)buffer;
-  float slow = 1;
   for (unsigned int i = 0; i < frames * 2; i += 2) {
     const float l = bufferData[i];
     const float r = bufferData[i + 1];
@@ -249,4 +223,15 @@ static void AudioProcessEffectAverage(void *buffer, unsigned int frames) {
   for (int i = 0; i < 2; i++)
     averageVolume[i] = averageVolume[i + 1];
   averageVolume[1] = average;
+}
+
+static void applyShader(Shader *shader, Texture *texture, Model *model) {
+  int ambientLoc = GetShaderLocation(*shader, "ambient");
+  model->materials[0].shader = *shader;
+  model->materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = *texture;
+  shader->locs[SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(*shader, "viewPos");
+
+  // ambient light
+  SetShaderValue(*shader, ambientLoc, (float[4]){0.0f, 0.05, 0.1f, 1.0f},
+                 SHADER_UNIFORM_VEC4);
 }
